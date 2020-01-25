@@ -1,5 +1,5 @@
 import pygame
-from pygame import gfxdraw
+from pygame import gfxdraw, freetype
 import math
 from math import sin, cos
 import sys
@@ -10,11 +10,11 @@ import numpy as np
 
 # TODO: make colours fade, so that quick flashing images arent as jarring
 
-SONG = 'assets/music/song.wav'
-WIDTH = 1280
-HEIGHT = 720
+SONG = 'assets/music/stormz2.wav'
+WIDTH = 1000
+HEIGHT = 700
 FRAMES_PER_SECOND = 60
-ARROW_SPEED = 0.15
+ARROW_SPEED = 0.1
 OBSTACLE_SPAWN_RATE = 750
 
 CREATE_OBSTACLE_EVENT = pygame.USEREVENT + 1
@@ -41,17 +41,33 @@ class Obstacle(pygame.sprite.Sprite):
 
     thickness = 25
 
-    def __init__(self, gap_angle, gap_width):
+    def __init__(self, gap_angles, gap_widths):
         super().__init__()
         self.pump = 0
         self.size = max(WIDTH, HEIGHT) + 300
         self.center = WIDTH//2, HEIGHT//2
         self.image = pygame.Surface((WIDTH, HEIGHT))
-        self.gap_angle = gap_angle
-        self.gap_width = gap_width
+        self.gap_angles = np.asarray(gap_angles)
+        self.gap_widths = gap_widths
         self.gap_line_length = self.thickness * 6
         self.rect = self.image.get_rect()
         self.image.set_colorkey(BLACK)
+
+    def draw_gap(self, width, angle, distance, thickness):
+        small_angle = math.atan2(distance, width/2)
+        poly_distance = int(math.sqrt((width/2)**2 + distance**2))
+        sm_distance = poly_distance - thickness//2
+        lg_distance = poly_distance + thickness//2 + 50
+
+        lower_angle = angle - 0.025 * width
+        upper_angle = angle + 0.025 * width
+
+        p1 = (self.center[0] + int(sm_distance * cos(lower_angle)), self.center[1] + int(sm_distance * sin(lower_angle)))
+        p2 = (self.center[0] + int(lg_distance * cos(lower_angle)), self.center[1] + int(lg_distance * sin(lower_angle)))
+        p3 = (self.center[0] + int(lg_distance * cos(upper_angle)), self.center[1] + int(lg_distance * sin(upper_angle)))
+        p4 = (self.center[0] + int(sm_distance * cos(upper_angle)), self.center[1] + int(sm_distance * sin(upper_angle)))
+
+        return (p1, p2, p3, p4)
 
     def update(self):
         self.size -= 10
@@ -65,13 +81,9 @@ class Obstacle(pygame.sprite.Sprite):
         if draw_size//2 > self.thickness:
             gfxdraw.filled_circle(self.image, *self.center, draw_size//2-self.thickness, BLACK)
         
-
-        self.gap_line_start = (self.center[0] + int((draw_size//2 - self.gap_line_length//2) * cos(self.gap_angle)),
-                               self.center[1] + int((draw_size//2 - self.gap_line_length//2) * sin(self.gap_angle)))
-        self.gap_line_point = (self.gap_line_start[0] + int(self.gap_line_length * cos(self.gap_angle)),
-                               self.gap_line_start[1] + int(self.gap_line_length * sin(self.gap_angle)))
-
-        pygame.draw.line(self.image, BLACK, self.gap_line_start, self.gap_line_point, 100)
+        for width, angle in zip(self.gap_widths, self.gap_angles):
+            points = self.draw_gap(width, angle, draw_size//2, self.gap_line_length)
+            pygame.draw.polygon(self.image, BLACK, points)
 
         self.mask = pygame.mask.from_surface(self.image, 50)
 
@@ -111,6 +123,9 @@ class Player(pygame.sprite.Sprite):
         
 
 pygame.init()
+s_time_font = freetype.Font('assets/fonts/Bangers-Regular.ttf', 64)
+ms_time_font = freetype.Font('assets/fonts/Bangers-Regular.ttf', 32)
+
 
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 clock = pygame.time.Clock()
@@ -142,6 +157,8 @@ last_colour_change = 0
 
 current_background = np.array([random.choice(BACKGROUND_COLOURS)])
 
+timer = 0
+
 while True:
 
     clock.tick(FRAMES_PER_SECOND)
@@ -164,6 +181,11 @@ while True:
         current_background = np.linspace(current_background[0], new_background, int(FRAMES_PER_SECOND * 0.1))
         last_colour_change = 0
 
+        if random.randrange(5) == 0:
+            speed = random.randint(1, 5) / 100
+            direction = random.choice((-1, 1))
+            screen_rotation_speed = speed * direction
+
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             sys.exit()
@@ -178,29 +200,32 @@ while True:
             elif event.key == pygame.K_RIGHT:
                 right = 0
         elif event.type == CREATE_OBSTACLE_EVENT:
-            angle = random.random() * 2 * math.pi
-            width = random.randrange(20) + 100
-            obstacle = Obstacle(angle, width)
+            number_of_gaps = random.randint(1, 3)
+            angles = [random.random() * 2 * math.pi for _ in range(number_of_gaps)]
+            widths = [random.randrange(5) + 10 for _ in range(number_of_gaps)]
+            obstacle = Obstacle(angles, widths)
             obstacles.add(obstacle)
-        elif event.type == CHANGE_DIRECTION_EVENT:
-            if random.randrange(10) == 0:
-                speed = random.randint(1, 3) / 100
-                direction = random.choice((-1, 1))
-                screen_rotation_speed = speed * direction
+        # elif event.type == CHANGE_DIRECTION_EVENT:
+        #     if random.randrange(10) == 0:
+        #         speed = random.randint(1, 3) / 100
+        #         direction = random.choice((-1, 1))
+        #         screen_rotation_speed = speed * direction
 
     for n, obstacle in enumerate(obstacles):
-        if n < 1:
-            if pygame.sprite.collide_mask(obstacle, player):
-                sys.exit()
-        obstacle.gap_angle += screen_rotation_speed
+        # if n < 1:
+        #     if pygame.sprite.collide_mask(obstacle, player):
+        #         sys.exit()
+        obstacle.gap_angles += screen_rotation_speed
         obstacle.pump = pump
 
     player.angle += left - right - screen_rotation_speed
     player.pump = pump//5
 
     screen.fill(current_background[0])
+
     if len(current_background) > 1:
         current_background = np.delete(current_background, 0, axis=0)
+
     last_colour_change += 1
 
     obstacles.draw(screen)
@@ -208,5 +233,12 @@ while True:
     
     gfxdraw.aacircle(screen, WIDTH//2, HEIGHT//2, 60 + pump//5, WHITE)
     gfxdraw.filled_circle(screen, WIDTH//2, HEIGHT//2, 60 + pump//5, WHITE)
+
+    timer += 1 / FRAMES_PER_SECOND
+    seconds = int(timer)
+    miliseconds = int((timer % 1) * 1000)
+
+    s_time_font.render_to(screen, (15, 15), f'{seconds}.{miliseconds}', WHITE)
+
 
     pygame.display.flip()
