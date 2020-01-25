@@ -48,11 +48,10 @@ class SongAnalysis:
             else:
                 point_samples.append(amps.max()*((1+self.sensitivity/10+(self.sensitivity-1)/10)**(n/50)))
 
-
-
-        # # interpolate points
-        # rs = gaussian_filter1d(self.amps, sigma=2)
-
         # they are divided by the highest sample in the song to normalise the
         # amps in terms of decimals from 0 -> 1
         return point_samples / self.max_sample
+
+    @property
+    def duration(self):
+        return self.song.duration_seconds
