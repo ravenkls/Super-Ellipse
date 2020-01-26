@@ -20,6 +20,7 @@ class Obstacle(pygame.sprite.Sprite):
         self.gap_line_length = self.thickness * 6
         self.rect = self.image.get_rect()
         self.image.set_colorkey(BLACK)
+        self.screen_rotation_speed = 0
 
     def draw_gap(self, width, angle, distance, thickness):
         small_angle = math.atan2(distance, width/2)
@@ -39,6 +40,8 @@ class Obstacle(pygame.sprite.Sprite):
 
     def update(self):
         self.size -= 10
+        self.gap_angles += self.screen_rotation_speed
+        
         draw_size = int(self.size + self.pump)
         
         if draw_size <= 0:
@@ -62,7 +65,7 @@ class Player(pygame.sprite.Sprite):
 
     def __init__(self):
         super().__init__()
-        self.image_file = pygame.image.load('assets/images/arrow.png')
+        self.image_file = pygame.image.load('assets/images/arrow.png').convert_alpha()
         self.arrow = pygame.transform.scale(self.image_file, (13, 8))
         self.mask = pygame.mask.from_surface(self.arrow)
         self.pump = 0
@@ -71,6 +74,9 @@ class Player(pygame.sprite.Sprite):
         self.center_point = (0, 0)
         self.angle = 0
         self.r = 100
+        self.left = 0
+        self.right = 0
+        self.screen_rotation_speed = 0
 
     @property
     def angle(self):
@@ -86,5 +92,6 @@ class Player(pygame.sprite.Sprite):
         self.center_point = x, y
 
     def update(self):
+        self.angle += self.left - self.right - self.screen_rotation_speed
         self.rect.centerx = int(self.center_point[0] + (self.r + self.pump) * math.sin(self.theta))
         self.rect.centery = int(self.center_point[1] + (self.r + self.pump) * math.cos(self.theta))

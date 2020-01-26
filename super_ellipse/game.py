@@ -17,9 +17,14 @@ class GameSurface(pygame.Surface):
         self.screen = screen
         self.failed_callback = lambda: None
 
+        # Sounds
+        self.gameover_sound = pygame.mixer.Sound('assets/sounds/gameover.wav')
+
         # Timer Display
         self.time_surface = pygame.Surface((230, 80), pygame.SRCALPHA)
         self.time_font = pygame.freetype.Font('assets/fonts/Square.ttf', 55)
+        self.last_obstacle_spawned_at = 0
+        self.last_obstacle_update = 0
 
         # Sprites
         self.obstacles = pygame.sprite.Group()
@@ -44,7 +49,7 @@ class GameSurface(pygame.Surface):
         # Movement
         self.left = 0
         self.right = 0
-        self.screen_rotation_speed = 0.01
+        self.screen_rotation_speed = 0
         self.pump = 0
         self.last_pump = 0
 
@@ -60,9 +65,10 @@ class GameSurface(pygame.Surface):
     def set_gameover_callback(self, callback):
         self.failed_callback = callback
 
+    def timer_update(self, miliseconds):
+        self.timer += miliseconds / 1000
+
     def update(self):
-        self.obstacles.update()
-        self.entities.update()
 
         self.last_pump = self.pump
 
@@ -80,8 +86,8 @@ class GameSurface(pygame.Surface):
             self.current_background = np.linspace(self.current_background[0], new_background, int(FRAMES_PER_SECOND * 0.1))
             self.last_colour_change = 0
 
-            if random.randrange(5) == 0:
-                speed = random.randint(1, 5) / 100
+            if random.randint(1, int(1/TURN_CHANGE_CHANCE)) == 1:
+                speed = random.randint(LOWEST_TURN_SPEED, HIGHEST_TURN_SPEED) / 100
                 direction = random.choice((-1, 1))
                 self.screen_rotation_speed = speed * direction
 
@@ -91,10 +97,12 @@ class GameSurface(pygame.Surface):
                     pygame.mixer.music.stop()
                     self.reset_settings()
                     return self.failed_callback()
-            obstacle.gap_angles += self.screen_rotation_speed
+            obstacle.screen_rotation_speed = self.screen_rotation_speed
             obstacle.pump = self.pump
 
-        self.player.angle += self.left - self.right - self.screen_rotation_speed
+        self.player.screen_rotation_speed = self.screen_rotation_speed
+        self.player.left = self.left
+        self.player.right = self.right
         self.player.pump = self.pump // 5
 
         self.fill(self.current_background[0])
@@ -107,19 +115,19 @@ class GameSurface(pygame.Surface):
         self.obstacles.draw(self)
         self.entities.draw(self)
         
-        pygame.gfxdraw.aacircle(self, WIDTH//2, HEIGHT//2, 60 + self.pump//5, WHITE)
+        if ANTIALIASING_ENABLED:
+            pygame.gfxdraw.aacircle(self, WIDTH//2, HEIGHT//2, 60 + self.pump//5, WHITE)
         pygame.gfxdraw.filled_circle(self, WIDTH//2, HEIGHT//2, 60 + self.pump//5, WHITE)
 
-        # Timer Surface
-        self.timer += 1 / FRAMES_PER_SECOND
         seconds = int(self.timer)
         miliseconds = int((self.timer % 1) * 100)
         percent = seconds / self.song_length
 
-        pygame.gfxdraw.aapolygon(self.time_surface, ((0, 0),
-                                        (self.time_surface.get_width(), 0),
-                                        self.time_surface.get_size(),
-                                        (40, self.time_surface.get_height())), BLACK)
+        if ANTIALIASING_ENABLED:
+            pygame.gfxdraw.aapolygon(self.time_surface, ((0, 0),
+                                            (self.time_surface.get_width(), 0),
+                                            self.time_surface.get_size(),
+                                            (40, self.time_surface.get_height())), BLACK)
 
         pygame.gfxdraw.filled_polygon(self.time_surface, ((0, 0),
                                             (self.time_surface.get_width(), 0),

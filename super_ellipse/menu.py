@@ -2,7 +2,6 @@ import pygame
 import pygame.freetype
 import numpy as np
 import itertools
-
 from .settings import *
 
 

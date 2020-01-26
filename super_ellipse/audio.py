@@ -13,6 +13,16 @@ class SongAnalysis:
         super().__init__()
         self.song = AudioSegment.from_file(song).set_channels(1)
         self.samples = np.asarray(self.song.get_array_of_samples())
+        self.sub_samples = np.array_split(self.samples, self.song.duration_seconds*20)
+        self.fft_data = []
+
+        for sample_set in self.sub_samples:
+            fourier = np.fft.fft(sample_set)
+            freq = np.fft.fftfreq(fourier.size, d=0.05)
+            amps = 2/sample_set.size * np.abs(fourier)
+            data = np.array([freq, amps]).T
+            self.fft_data.append((freq, amps, data))
+
         self.max_sample = self.samples.max()
         self.resolution = 100
         self.visual_delta_threshold = 1000
@@ -22,17 +32,11 @@ class SongAnalysis:
     def calculate_amps(self, t):
         """Calculates the amplitudes used for visualising the media."""
         if not self.offset:
-            self.offset = t / 1000
+            self.offset = t
         
-        sample_count = int(self.song.frame_rate * 0.05)
-        start_index = int(((t/1000) - self.offset) * self.song.frame_rate)
-        v_sample = self.samples[start_index:start_index+sample_count]  # samples to analyse
+        index = round((t - self.offset) * 20 / 1000)
+        freq, amps, data = self.fft_data[index]
 
-        # use FFTs to analyse frequency and amplitudes
-        fourier = np.fft.fft(v_sample)
-        freq = np.fft.fftfreq(fourier.size, d=0.05)
-        amps = 2/v_sample.size * np.abs(fourier)
-        data = np.array([freq, amps]).T
 
         point_range = 1 / self.resolution
         point_samples = []

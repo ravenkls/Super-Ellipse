@@ -7,13 +7,16 @@ from super_ellipse.surfaces import GameSurface, MenuSurface
 pygame.mixer.init(44100, -16, 2, 512)
 pygame.init()
 
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
+screen = pygame.display.set_mode((WIDTH, HEIGHT), flags=pygame.RESIZABLE)
+print('ok')
 pygame.display.set_caption('Super Ellipse')
 pygame.display.set_icon(pygame.image.load('assets/images/logo.png'))
 clock = pygame.time.Clock()
 
 # Timing
-pygame.time.set_timer(CREATE_OBSTACLE_EVENT, OBSTACLE_SPAWN_RATE)
+pygame.time.set_timer(TIMER_UPDATE, TIMER_UPDATE_INTERVAL)
+pygame.time.set_timer(OBSTACLE_SPAWN, OBSTACLE_SPAWN_RATE)
+pygame.time.set_timer(GAME_UPDATE, GAME_UPDATE_RATE)
 
 # Surfaces
 menu = MenuSurface(screen)
@@ -23,13 +26,14 @@ game.set_song(SONG)
 game.set_gameover_callback(menu.return_to_menu)
 
 
-
 while True:
     clock.tick(FRAMES_PER_SECOND)
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             quit()
+        elif event.type == pygame.VIDEORESIZE:
+            pygame.display.set_mode(event.size)
         elif menu.enabled:
             # MENU CONTROLS
             if event.type == pygame.KEYDOWN:
@@ -51,8 +55,13 @@ while True:
                     game.move_left(0)
                 elif event.key == pygame.K_RIGHT:
                     game.move_right(0)
-            elif event.type == CREATE_OBSTACLE_EVENT:
+            elif event.type == TIMER_UPDATE:
+                game.timer_update(TIMER_UPDATE_INTERVAL)
+            elif event.type == OBSTACLE_SPAWN:
                 game.create_wall()
+            elif event.type == GAME_UPDATE:
+                game.obstacles.update()
+                game.entities.update()
 
     if menu.enabled:
         menu.update()
@@ -65,5 +74,4 @@ while True:
             pygame.mixer.music.load(game.song_file)
             pygame.mixer.music.play(-1)
         
-
     pygame.display.flip()
